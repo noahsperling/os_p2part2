@@ -17,7 +17,7 @@ using namespace std;
 #define NUMBER_OF_RESOURCES 2
 
 // mutex lock for synchronization
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t bank_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // data structures for bankers algorithm
 int available[NUMBER_OF_RESOURCES];
@@ -105,13 +105,15 @@ int resource_request(int customer, int request[]){
   // if the customer is asking for more than it needs, return -1
   for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
     if (request[i] > need[customer][i]) {
+      cout << "Invalid request\n";
       return -1;
     }
   }
 
-  // checks to see if the thread is requesting more resources than are availabe
+  // checks to see if the thread is requesting more resources than are available
   for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
     if (request[i] > available[i]) {
+      cout << "Invalid request\n";
       return -1;
     }
   }
@@ -143,7 +145,7 @@ int resource_request(int customer, int request[]){
 
   // if the system will not be in a safe state, reset old values
   if (!is_safe) {
-    cout << "System is not safe, resetting values" << endl;
+    cout << "System is not safe, request denied" << endl;
     for (int i = 0; i < NUMBER_OF_CUSTOMERS; i++) {
       for (int j = 0; j < NUMBER_OF_RESOURCES; j++) {
         if (i == 0) {
@@ -155,7 +157,7 @@ int resource_request(int customer, int request[]){
     }
     return 0;
   }
-
+  cout << "Resource request granted\n";
   // otherwise, new values are left and function returns
   return 1;
 }
@@ -167,7 +169,7 @@ int resource_release(int customer, int release[]) {
   // if the customer is trying to release more resources than they have, fails
   for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
     if (allocation[customer][i] < release[i]) {
-      cout << "Invalid release request" << endl;
+      cout << "Invalid release request\n";
       return -1;
     }
   }
@@ -176,7 +178,7 @@ int resource_release(int customer, int release[]) {
   for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
     allocation[customer][i] -=  release[i];
   }
-  cout << "Resources released" << endl;
+  cout << "Resources released\n";
   return 1;
 }
 
@@ -195,7 +197,6 @@ void *customer(void *arg) {
 
     if (r_or_r > 5) {
       //request
-      cout << "customer " << index << " making a request" << endl;
 
       // generates array for request
       int r[NUMBER_OF_RESOURCES];
@@ -204,20 +205,22 @@ void *customer(void *arg) {
           r[i] = rand() % need[index][i];
         } else if (need[index][i] == 1) {
           r[i] = 1;
+        } else {
+          r[i] = 0;
         }
       }
 
       // if the other customers aren't making a request or release, request
-      int temp = pthread_mutex_trylock(&mutex);
+      int temp = pthread_mutex_trylock(&bank_mutex);
       if (temp != 0) {
         continue;
       }
+      cout << "customer " << index << " making a request\n";
       resource_request(index, r);
-      pthread_mutex_unlock(&mutex);
+      pthread_mutex_unlock(&bank_mutex);
 
     } else {
       //release
-      cout << "customer " << index << " making a release" << endl;
 
       // generates array for release
       int r[NUMBER_OF_RESOURCES];
@@ -226,20 +229,22 @@ void *customer(void *arg) {
           r[i] = rand() % allocation[index][i];
         } else if (allocation[index][i] == 1) {
           r[i] = 1;
+        } else {
+          r[i] = 0;
         }
       }
 
       // if the other customers aren't making a request or release, release
-      int temp = pthread_mutex_trylock(&mutex);
+      int temp = pthread_mutex_trylock(&bank_mutex);
       if (temp != 0) {
-        cout << "Mutex locked, waiting" << endl;
         continue;
       }
-      resource_request(index, r);
-      pthread_mutex_unlock(&mutex);
+      cout << "customer " << index << " making a release\n";
+      resource_release(index, r);
+      pthread_mutex_unlock(&bank_mutex);
     }
     // sleeps so threads aren't constantly requesting and releasing
-    sleep(1.5);
+    sleep(1);
   }
 }
 
